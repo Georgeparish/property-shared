@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # --- URI-to-code reverse mappings ---
 
@@ -140,12 +140,53 @@ class PPDCompsQuery(BaseModel):
 
 
 class SubjectProperty(BaseModel):
-    """Subject property details for comps context."""
+    """Subject property details for comps context.
+
+    Invariants enforced by the ``_history_must_be_one_property`` validator:
+      - All transactions in ``transaction_history`` must share the same
+        (paon, street) tuple — i.e. represent a single building.
+      - ``last_sale``, if present, must belong to that same building.
+      - ``transaction_count`` must equal ``len(transaction_history)``.
+
+    These rules prevent a SubjectProperty from silently representing an
+    aggregate across multiple addresses (e.g., a whole-street match from
+    a vague query).
+    """
     address: str
     postcode: str
     last_sale: Optional[PPDTransaction] = None
     transaction_count: int = 0
     transaction_history: List[PPDTransaction] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _history_must_be_one_property(self) -> SubjectProperty:
+        if not self.transaction_history:
+            # Empty history is allowed — represents "no sales found for this property"
+            return self
+
+        identities = {(t.paon, t.street) for t in self.transaction_history}
+        if len(identities) > 1:
+            raise ValueError(
+                f"transaction_history spans {len(identities)} distinct "
+                f"(paon, street) tuples — a SubjectProperty cannot represent "
+                f"multiple buildings"
+            )
+
+        if self.last_sale is not None:
+            last_id = (self.last_sale.paon, self.last_sale.street)
+            if last_id not in identities:
+                raise ValueError(
+                    f"last_sale ({last_id}) does not belong to transaction_history "
+                    f"({identities})"
+                )
+
+        if self.transaction_count != len(self.transaction_history):
+            raise ValueError(
+                f"transaction_count ({self.transaction_count}) must equal "
+                f"len(transaction_history) ({len(self.transaction_history)})"
+            )
+
+        return self
 
 
 class PPDCompsResponse(BaseModel):

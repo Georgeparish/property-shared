@@ -312,29 +312,28 @@ class PPDService:
     def _find_subject_property(
         self, postcode: str, address: str
     ) -> Optional[SubjectProperty]:
-        """Search for a specific property by postcode and address."""
-        address_clean = address.strip()
+        """Search for a specific property by postcode and address.
 
-        # Try to extract PAON (building number/name) from start of address
-        parts = address_clean.split(",")
-        first_part = parts[0].strip()
+        Returns None rather than an ambiguous guess when:
+          - the address lacks a parseable PAON (house number), or
+          - the query returns transactions spanning multiple buildings, or
+          - the SPARQL search fails for any reason.
 
-        # Split first part into potential PAON and street
-        words = first_part.split()
-        paon = None
-        street = None
+        This is deliberate: a SubjectProperty represents one specific
+        building. Callers that pass vague input (e.g. just a street name)
+        get None, not the most-recent sale on the street labelled as "theirs".
+        """
+        paon = self._parse_paon(address)
+        if paon is None:
+            # No house number → can't identify a specific property
+            return None
 
-        if words:
-            # If first word is a number or looks like a building number, use it as PAON
-            if words[0].isdigit() or (len(words[0]) <= 4 and any(c.isdigit() for c in words[0])):
-                paon = words[0]
-                street = " ".join(words[1:]) if len(words) > 1 else None
-            else:
-                # Might be a building name like "Rose Cottage"
-                street = first_part
+        # Use the part of the address after the PAON as the street filter
+        address_clean = address.strip().split(",")[0].strip()
+        words = address_clean.split()
+        street = " ".join(words[1:]) if len(words) > 1 else None
 
         try:
-            # Search for this specific property
             transactions = self.client.sparql_search(
                 postcode=postcode,
                 paon=paon,
@@ -342,44 +341,73 @@ class PPDService:
                 limit=50,
                 order_desc=True,
             )
-
-            if not transactions:
-                # Try with just postcode and full address as street
-                transactions = self.client.sparql_search(
-                    postcode=postcode,
-                    street=address_clean,
-                    limit=50,
-                    order_desc=True,
-                )
-
-            if transactions:
-                # Sort by date descending
-                transactions.sort(key=lambda t: t.date or "", reverse=True)
-
-                # Build formatted address from first transaction
-                first = transactions[0]
-                addr_parts = []
-                if first.paon:
-                    addr_parts.append(first.paon)
-                if first.saon:
-                    addr_parts.append(first.saon)
-                if first.street:
-                    addr_parts.append(first.street)
-                if first.town:
-                    addr_parts.append(first.town)
-                formatted_address = ", ".join(addr_parts) if addr_parts else address_clean
-
-                return SubjectProperty(
-                    address=formatted_address,
-                    postcode=first.postcode or postcode,
-                    last_sale=transactions[0] if transactions else None,
-                    transaction_count=len(transactions),
-                    transaction_history=transactions,
-                )
         except Exception:
-            # If search fails, return None (don't fail the whole comps request)
-            pass
+            # Upstream failure — don't break the whole comps request
+            return None
 
+        if not transactions:
+            return None
+
+        # Uniqueness check: all matched transactions must represent the same
+        # building. If CONTAINS matching returned multiple distinct houses,
+        # the input was ambiguous and we should not guess.
+        identities = {(t.paon, t.street) for t in transactions}
+        if len(identities) != 1:
+            return None
+
+        # Sort by date desc — most recent sale first
+        transactions.sort(key=lambda t: t.date or "", reverse=True)
+        first = transactions[0]
+
+        addr_parts: list[str] = []
+        if first.paon:
+            addr_parts.append(first.paon)
+        if first.saon:
+            addr_parts.append(first.saon)
+        if first.street:
+            addr_parts.append(first.street)
+        if first.town:
+            addr_parts.append(first.town)
+        formatted_address = ", ".join(addr_parts) if addr_parts else address_clean
+
+        return SubjectProperty(
+            address=formatted_address,
+            postcode=first.postcode or postcode,
+            last_sale=first,
+            transaction_count=len(transactions),
+            transaction_history=transactions,
+        )
+
+    @staticmethod
+    def _parse_paon(address: str) -> Optional[str]:
+        """Extract a house number (PAON) from the start of an address.
+
+        Returns None for addresses without a leading numeric token — i.e.
+        bare street names, substrings, or building-name-only inputs. This
+        is the parse-gate that prevents ambiguous queries.
+
+        Examples:
+            "39 Havenwood Rise"     -> "39"
+            "42a High Street"       -> "42a"
+            "Flat 4, 39 High St"    -> "39"  (falls through to second token)
+            "Havenwood Rise"        -> None
+            "Rose Cottage"          -> None
+            "haven"                 -> None
+        """
+        parts = [p.strip() for p in address.strip().split(",")]
+        # Walk through comma-separated parts looking for one starting with a digit.
+        # This handles "Flat 4, 39 High Street" where the first part is the flat
+        # and the second part has the PAON.
+        for part in parts:
+            if not part:
+                continue
+            words = part.split()
+            if not words:
+                continue
+            first = words[0]
+            # Accept: "39", "42a", "1b" — leading digit, short, alphanumeric
+            if first[0].isdigit():
+                return first
         return None
 
     def transaction_record(
