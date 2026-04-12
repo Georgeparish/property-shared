@@ -333,17 +333,29 @@ def epc_search(
     """
     http = _maybe_http_client(api_url)
     if http:
-        params: dict[str, object] = {"include_raw": include_raw}
+        # API mode
         if q:
-            params["q"] = q
-        else:
+            params: dict[str, object] = {"q": q, "include_raw": include_raw}
+            data = http.get("/v1/epc/search", params=params)
+        elif address:
             if not postcode:
                 typer.echo("Provide postcode argument or --q parameter")
                 raise typer.Exit(code=1)
-            params["postcode"] = _join_tokens(postcode)
-            if address:
-                params["address"] = address
-        data = http.get("/v1/epc/search", params=params)
+            params = {
+                "postcode": _join_tokens(postcode),
+                "address": address,
+                "include_raw": include_raw,
+            }
+            data = http.get("/v1/epc/search", params=params)
+        else:
+            # No address → area view
+            if not postcode:
+                typer.echo("Provide postcode argument or --q parameter")
+                raise typer.Exit(code=1)
+            data = http.get(
+                "/v1/epc/search-area",
+                params={"postcode": _join_tokens(postcode)},
+            )
         _echo_json(data)
         return
 
@@ -370,12 +382,53 @@ def epc_search(
         raise typer.Exit(code=1)
     import asyncio
 
-    result = asyncio.run(client.search_by_postcode(postcode_value, address=address))
-    if not result:
-        typer.echo("No EPC found")
+    if address:
+        # Single-property mode
+        result = asyncio.run(client.search_by_postcode(postcode_value, address=address))
+        if not result:
+            typer.echo("No EPC found")
+            raise typer.Exit(code=1)
+        output = {"record": result.model_dump(), "raw": result.raw if include_raw else None}
+        _echo_json(output)
+        return
+
+    # Area mode — no address
+    certs = asyncio.run(client.search_all_by_postcode(postcode_value))
+    if not certs:
+        typer.echo("No EPC certificates found")
         raise typer.Exit(code=1)
-    output = {"record": result.model_dump(), "raw": result.raw if include_raw else None}
-    _echo_json(output)
+
+    from collections import Counter
+    ratings = Counter(c.rating for c in certs if c.rating)
+    types = Counter(c.property_type for c in certs if c.property_type)
+    areas = [c.floor_area for c in certs if c.floor_area]
+
+    rprint(f"\n[bold]EPC Area Summary — {postcode_value}[/bold]  ({len(certs)} certificates)")
+
+    if ratings:
+        rating_table = Table(title="Rating Distribution")
+        rating_table.add_column("Rating")
+        rating_table.add_column("Count", justify="right")
+        for r, n in sorted(ratings.items()):
+            rating_table.add_row(r, str(n))
+        rprint(rating_table)
+
+    if areas:
+        rprint(
+            f"[bold]Floor area:[/bold] {int(min(areas))}–{int(max(areas))} sqm "
+            f"(avg {round(sum(areas) / len(areas))}) — {len(areas)}/{len(certs)} have area data"
+        )
+
+    if types:
+        type_table = Table(title="Property Types")
+        type_table.add_column("Type")
+        type_table.add_column("Count", justify="right")
+        for t, n in sorted(types.items()):
+            type_table.add_row(t, str(n))
+        rprint(type_table)
+
+    if include_raw:
+        _echo_json([c.model_dump() for c in certs])
 
 
 @epc.command("certificate")

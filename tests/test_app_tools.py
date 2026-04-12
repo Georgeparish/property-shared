@@ -158,18 +158,18 @@ def test_search_company_not_configured():
 # ---------------------------------------------------------------------------
 
 
-def test_lookup_epc_no_data():
-    """lookup_epc returns error dict when no EPC data found."""
+def test_lookup_epc_with_address_no_data():
+    """lookup_epc (with address) returns error dict when no EPC match."""
     from property_app.tools import lookup_epc
 
     with patch("property_core.EPCClient") as mock_cls:
         mock_cls.return_value.search_by_postcode = AsyncMock(return_value=None)
-        result = asyncio.run(lookup_epc("ZZ99 9ZZ"))
+        result = asyncio.run(lookup_epc("ZZ99 9ZZ", address="1 Fake St"))
         assert result == {"error": "No EPC data"}
 
 
-def test_lookup_epc_with_result():
-    """lookup_epc returns dict when EPC data found."""
+def test_lookup_epc_with_address_and_result():
+    """lookup_epc (with address) returns single cert dict when matched."""
     from property_app.tools import lookup_epc
 
     mock_epc = MagicMock()
@@ -181,9 +181,56 @@ def test_lookup_epc_with_result():
 
     with patch("property_core.EPCClient") as mock_cls:
         mock_cls.return_value.search_by_postcode = AsyncMock(return_value=mock_epc)
-        result = asyncio.run(lookup_epc("SW1A 1AA"))
+        result = asyncio.run(lookup_epc("SW1A 1AA", address="1 Test Street"))
         assert isinstance(result, dict)
         assert result["current_rating"] == "C"
+
+
+def test_lookup_epc_no_address_empty():
+    """lookup_epc without address returns error dict when area has no certs."""
+    from property_app.tools import lookup_epc
+
+    with patch("property_core.EPCClient") as mock_cls:
+        mock_cls.return_value.search_all_by_postcode = AsyncMock(return_value=[])
+        result = asyncio.run(lookup_epc("ZZ99 9ZZ"))
+        assert result == {"error": "No EPC data"}
+
+
+def test_lookup_epc_no_address_returns_area_summary():
+    """lookup_epc without address returns area summary with all certs."""
+    from property_app.tools import lookup_epc
+
+    def make_cert(rating, floor_area, prop_type):
+        m = MagicMock()
+        m.rating = rating
+        m.floor_area = floor_area
+        m.property_type = prop_type
+        m.model_dump.return_value = {
+            "rating": rating,
+            "floor_area": floor_area,
+            "property_type": prop_type,
+        }
+        return m
+
+    certs = [
+        make_cert("C", 80.0, "Flat"),
+        make_cert("B", 95.0, "Flat"),
+        make_cert("D", 60.0, "Flat"),
+        make_cert("C", 75.0, "Terraced"),
+    ]
+
+    with patch("property_core.EPCClient") as mock_cls:
+        mock_cls.return_value.search_all_by_postcode = AsyncMock(return_value=certs)
+        result = asyncio.run(lookup_epc("NG11 9HD"))
+
+    assert result["postcode"] == "NG11 9HD"
+    assert result["summary"]["count"] == 4
+    assert result["summary"]["rating_distribution"] == {"B": 1, "C": 2, "D": 1}
+    assert result["summary"]["property_type_breakdown"] == {"Flat": 3, "Terraced": 1}
+    assert result["summary"]["floor_area_min"] == 60.0
+    assert result["summary"]["floor_area_max"] == 95.0
+    assert result["summary"]["floor_area_avg"] == 77.5
+    assert len(result["certificates"]) == 4
 
 
 # ---------------------------------------------------------------------------

@@ -207,14 +207,45 @@ def company_search(
 
 
 async def lookup_epc(postcode: str, address: str | None = None) -> dict:
-    """Raw EPC lookup — returns dict. Used by the MCP tool and tests."""
+    """Raw EPC lookup — returns dict. Used by the MCP tool and tests.
+
+    With address: returns the matched certificate.
+    Without address: returns all certificates at the postcode with area summary.
+    """
+    from collections import Counter
+
     from property_core import EPCClient
 
     client = EPCClient()
-    result = await client.search_by_postcode(postcode, address=address)
-    if result is None:
+
+    if address:
+        result = await client.search_by_postcode(postcode, address=address)
+        if result is None:
+            return {"error": "No EPC data"}
+        return _slim(result.model_dump(mode="json"))
+
+    # Area mode
+    certs = await client.search_all_by_postcode(postcode)
+    if not certs:
         return {"error": "No EPC data"}
-    return _slim(result.model_dump(mode="json"))
+
+    ratings = Counter(c.rating for c in certs if c.rating)
+    types = Counter(c.property_type for c in certs if c.property_type)
+    areas = [c.floor_area for c in certs if c.floor_area]
+
+    summary = {
+        "count": len(certs),
+        "rating_distribution": dict(sorted(ratings.items())),
+        "property_type_breakdown": dict(sorted(types.items())),
+        "floor_area_min": min(areas) if areas else None,
+        "floor_area_max": max(areas) if areas else None,
+        "floor_area_avg": round(sum(areas) / len(areas), 1) if areas else None,
+    }
+    return _slim({
+        "postcode": postcode,
+        "summary": summary,
+        "certificates": [c.model_dump(mode="json") for c in certs],
+    })
 
 
 @mcp.tool(
@@ -226,14 +257,16 @@ async def epc_lookup(
     postcode: Annotated[str, Field(description="UK postcode to search for EPC certificates")],
     address: Annotated[
         str | None,
-        Field(description="Street address to match within the postcode (optional)"),
+        Field(description="Street address to match (omit for area view)"),
     ] = None,
 ) -> dict:
-    """Look up Energy Performance Certificate data for a UK property.
+    """Energy Performance Certificate data for a UK property or postcode area.
 
-    Searches the EPC register by postcode. If an address is provided,
-    attempts to fuzzy-match it against certificates at that postcode.
-    Otherwise returns the first certificate found.
+    With address: returns the matched certificate for that specific property.
+    Without address: returns all certificates at the postcode with area
+    aggregation — rating distribution, floor area range, property type
+    breakdown. Use the area mode for postcode-level views rather than
+    a single-property lookup.
     """
     return await lookup_epc(postcode, address=address)
 

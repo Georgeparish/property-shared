@@ -356,39 +356,77 @@ async def property_epc(
     postcode: str,
     address: Optional[str] = None,
 ) -> ToolResult:
-    """EPC certificate for a UK property — energy rating, score, floor area,
-    construction age, heating costs, and improvement potential.
+    """EPC certificate data for a UK property or postcode area.
 
-    Without an address, returns an arbitrary certificate from the postcode —
-    not a specific property. Always provide address for subject property lookup.
+    With address: returns the matched certificate for that property —
+    energy rating, score, floor area, construction age, heating costs.
+
+    Without address: returns all certificates at the postcode with
+    area-level aggregation (rating distribution, floor area range,
+    property type breakdown). Use this for area analysis rather than
+    a single-property lookup.
 
     Args:
         postcode: UK postcode (e.g. "SW1A 1AA")
-        address: Street address for exact match (strongly recommended)
+        address: Street address for exact match (omit for area view)
     """
+    from collections import Counter
+
     from property_core.epc_client import EPCClient
 
     epc = EPCClient()
     if not epc.is_configured():
         return ToolResult(content="EPC service not configured (set EPC_API_EMAIL and EPC_API_KEY)")
 
-    result = await epc.search_by_postcode(postcode, address=address)
-    if not result:
-        return ToolResult(content=f"No EPC found for {address or ''} {postcode}".strip())
+    # Single-property mode — address provided
+    if address:
+        result = await epc.search_by_postcode(postcode, address=address)
+        if not result:
+            return ToolResult(content=f"No EPC found for {address} {postcode}".strip())
 
-    data = result.model_dump(mode="json", exclude_none=True)
+        data = result.model_dump(mode="json", exclude_none=True)
+        parts = [f"EPC for {address}"]
+        if result.rating:
+            parts.append(f"Rating: {result.rating} (score {result.score})")
+        if result.floor_area:
+            parts.append(f"Floor area: {result.floor_area} sqm")
+        if result.property_type:
+            parts.append(f"Type: {result.property_type}")
+        if result.construction_age:
+            parts.append(f"Built: {result.construction_age}")
+        return _result(", ".join(parts), data)
 
-    parts = [f"EPC for {address or postcode}"]
-    if result.rating:
-        parts.append(f"Rating: {result.rating} (score {result.score})")
-    if result.floor_area:
-        parts.append(f"Floor area: {result.floor_area} sqm")
-    if result.property_type:
-        parts.append(f"Type: {result.property_type}")
-    if result.construction_age:
-        parts.append(f"Built: {result.construction_age}")
+    # Area mode — no address
+    certs = await epc.search_all_by_postcode(postcode)
+    if not certs:
+        return ToolResult(content=f"No EPC certificates found for {postcode}")
 
-    return _result(", ".join(parts), data)
+    ratings = Counter(c.rating for c in certs if c.rating)
+    types = Counter(c.property_type for c in certs if c.property_type)
+    areas = [c.floor_area for c in certs if c.floor_area]
+
+    summary = {
+        "count": len(certs),
+        "rating_distribution": dict(sorted(ratings.items())),
+        "property_type_breakdown": dict(sorted(types.items())),
+        "floor_area_min": min(areas) if areas else None,
+        "floor_area_max": max(areas) if areas else None,
+        "floor_area_avg": round(sum(areas) / len(areas), 1) if areas else None,
+    }
+    data = {
+        "postcode": postcode,
+        "summary": summary,
+        "certificates": [c.model_dump(mode="json", exclude_none=True) for c in certs],
+    }
+
+    rating_str = ", ".join(f"{r}:{n}" for r, n in sorted(ratings.items())) if ratings else "no ratings"
+    text_parts = [f"EPC area data for {postcode}: {len(certs)} certificates"]
+    text_parts.append(rating_str)
+    if areas:
+        text_parts.append(
+            f"floor area {int(min(areas))}-{int(max(areas))} sqm (avg {round(sum(areas) / len(areas))})"
+        )
+    return _result(" — ".join(text_parts), data)
 
 
 @mcp.tool()
