@@ -413,10 +413,23 @@ async def property_epc(
         "floor_area_max": max(areas) if areas else None,
         "floor_area_avg": round(sum(areas) / len(areas), 1) if areas else None,
     }
-    data = {
+
+    # Full data for structured_content (MCP Apps, dashboards, programmatic consumers)
+    structured_data = {
         "postcode": postcode,
         "summary": summary,
         "certificates": [c.model_dump(mode="json", exclude_none=True) for c in certs],
+    }
+
+    # Lean data for LLM-visible content — skip the 25-cert list to save tokens.
+    # Claude.ai only reads content[], so cutting certs here saves ~20KB per call.
+    # If the caller needs individual cert detail, they should call property_epc
+    # again with a specific address.
+    llm_data = {
+        "postcode": postcode,
+        "summary": summary,
+        "certificates_count": len(certs),
+        "note": "Full certificate list available in structured_content. For individual property details, call property_epc with a specific address.",
     }
 
     rating_str = ", ".join(f"{r}:{n}" for r, n in sorted(ratings.items())) if ratings else "no ratings"
@@ -426,7 +439,11 @@ async def property_epc(
         text_parts.append(
             f"floor area {int(min(areas))}-{int(max(areas))} sqm (avg {round(sum(areas) / len(areas))})"
         )
-    return _result(" — ".join(text_parts), data)
+
+    return ToolResult(
+        content=_content(" — ".join(text_parts), llm_data),
+        structured_content=_slim(structured_data),
+    )
 
 
 @mcp.tool()

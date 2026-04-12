@@ -197,7 +197,7 @@ def test_lookup_epc_no_address_empty():
 
 
 def test_lookup_epc_no_address_returns_area_summary():
-    """lookup_epc without address returns area summary with all certs."""
+    """lookup_epc without address returns area summary (no cert list for token budget)."""
     from property_app.tools import lookup_epc
 
     def make_cert(rating, floor_area, prop_type):
@@ -230,7 +230,10 @@ def test_lookup_epc_no_address_returns_area_summary():
     assert result["summary"]["floor_area_min"] == 60.0
     assert result["summary"]["floor_area_max"] == 95.0
     assert result["summary"]["floor_area_avg"] == 77.5
-    assert len(result["certificates"]) == 4
+    # Certificates list should NOT be in the LLM-visible dict — only the summary.
+    # Full certs are available via the core EPCClient directly if needed.
+    assert "certificates" not in result
+    assert "note" in result
 
 
 # ---------------------------------------------------------------------------

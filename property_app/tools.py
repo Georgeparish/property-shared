@@ -241,10 +241,14 @@ async def lookup_epc(postcode: str, address: str | None = None) -> dict:
         "floor_area_max": max(areas) if areas else None,
         "floor_area_avg": round(sum(areas) / len(areas), 1) if areas else None,
     }
+    # Return only the summary — skip the full 25-cert list to save tokens in
+    # the LLM context (data tools return dicts that the MCP framework puts in
+    # content[]; a 25-cert payload is ~20KB). For individual property detail,
+    # callers should re-call with a specific address.
     return _slim({
         "postcode": postcode,
         "summary": summary,
-        "certificates": [c.model_dump(mode="json") for c in certs],
+        "note": "Call lookup_epc again with a specific address for individual property details.",
     })
 
 
