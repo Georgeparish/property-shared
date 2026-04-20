@@ -169,14 +169,11 @@ def planning_search(
 
 
 def search_company(query: str) -> dict:
-    """Raw company search — returns dict. Used by the MCP tool and tests."""
+    """Raw company name search — returns dict. Used by the MCP tool and tests."""
     from property_core import CompaniesHouseClient
 
     client = CompaniesHouseClient()
-    if query.strip().isdigit() and len(query.strip()) <= 8:
-        result = client.lookup(query.strip())
-    else:
-        result = client.search(query)
+    result = client.search(query)
 
     if result is None:
         return {"error": "Not found"}
@@ -190,13 +187,13 @@ def search_company(query: str) -> dict:
 def company_search(
     query: Annotated[
         str,
-        Field(description="Company name to search or 8-digit company number to look up"),
+        Field(description="Company name to search (e.g. 'Tesco'). For direct lookup by number, use the company://{company_number} resource."),
     ],
 ) -> dict:
-    """Search Companies House for a UK company by name or number.
+    """Search Companies House by company name. Returns a list of matches.
 
-    If query is a numeric string (up to 8 digits), performs a direct
-    company lookup. Otherwise searches by name.
+    For a direct lookup by company number, use the company://{company_number}
+    resource instead (e.g. read_resource("company://00445790")).
     """
     return search_company(query)
 

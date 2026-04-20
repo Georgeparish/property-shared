@@ -113,29 +113,30 @@ def test_search_company_by_name():
 
 
 def test_search_company_by_number():
-    """search_company with numeric query calls client.lookup()."""
+    """search_company always calls client.search() — direct lookup by number uses the resource."""
     from property_app.tools import search_company
 
     mock_result = MagicMock()
     mock_result.model_dump.return_value = {
-        "company_number": "00445790",
-        "company_name": "Tesco PLC",
+        "query": "00445790",
+        "total_results": 1,
+        "companies": [{"company_number": "00445790", "company_name": "Tesco PLC"}],
     }
 
     with patch("property_core.CompaniesHouseClient") as mock_cls:
-        mock_cls.return_value.lookup.return_value = mock_result
+        mock_cls.return_value.search.return_value = mock_result
         result = search_company("00445790")
         assert isinstance(result, dict)
-        assert result["company_number"] == "00445790"
-        mock_cls.return_value.lookup.assert_called_once_with("00445790")
+        mock_cls.return_value.search.assert_called_once_with("00445790")
+        mock_cls.return_value.lookup.assert_not_called()
 
 
 def test_search_company_not_found():
-    """search_company returns error dict when lookup returns None."""
+    """search_company returns error dict when search returns None."""
     from property_app.tools import search_company
 
     with patch("property_core.CompaniesHouseClient") as mock_cls:
-        mock_cls.return_value.lookup.return_value = None
+        mock_cls.return_value.search.return_value = None
         result = search_company("99999999")
         assert result == {"error": "Not found"}
 

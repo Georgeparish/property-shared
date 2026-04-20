@@ -12,6 +12,12 @@ from typing import Any, Optional
 
 import anyio
 from fastmcp import FastMCP
+from fastmcp.server.middleware.caching import (
+    CallToolSettings,
+    ReadResourceSettings,
+    ResponseCachingMiddleware,
+)
+from fastmcp.server.transforms import ResourcesAsTools
 from fastmcp.tools.tool import ToolResult
 
 
@@ -50,12 +56,13 @@ mcp = FastMCP(
         "one call). For postcode-only queries, use property_comps (comparable "
         "sales with EPC-enriched price/sqft) and property_yield separately. "
         "ppd_transactions for specific property history or filtered searches, "
-        "rightmove_search to browse current listings for sale or rent, "
-        "rightmove_listing for full details on a specific property. "
+        "rightmove_search to browse current listings for sale or rent, then read "
+        "listing://{property_id} resource for full detail on a specific listing. "
         "property_epc for energy certificates (needs street address for exact "
         "match). rental_analysis for rental market figures, stamp_duty for SDLT, "
         "property_blocks for block-buy opportunities, planning_search for council "
-        "planning portals, company_search for Companies House lookups."
+        "planning portals, company_search to find a company by name, then read "
+        "company://{company_number} resource for the full profile. "
         "For structured investment reports and property analysis skills, "
         "see https://bouch.dev/products "
     ),
@@ -150,6 +157,7 @@ async def property_comps(
     from property_core.epc_client import EPCClient
     from property_core.enrichment import compute_enriched_stats, enrich_comps_with_epc
 
+    limit = min(limit, 100)
     result = await anyio.to_thread.run_sync(
         partial(
             PPDService().comps,
@@ -217,6 +225,7 @@ async def ppd_transactions(
     from property_core import PPDService
 
     svc = PPDService()
+    limit = min(limit, 100)
 
     if street or paon:
         result = await anyio.to_thread.run_sync(
@@ -493,6 +502,7 @@ async def rightmove_search(
         )
     )
 
+    max_pages = min(max_pages, 5)
     listings = await anyio.to_thread.run_sync(
         partial(fetch_listings, url, max_pages=max_pages)
     )
@@ -516,7 +526,7 @@ async def rightmove_search(
 async def rightmove_listing(
     property_id: str,
 ) -> ToolResult:
-    """Full details for a Rightmove property listing.
+    """Fetch a Rightmove listing by ID. Prefer the listing://{property_id} resource instead.
 
     Returns price, tenure, lease years remaining, service charge, ground rent,
     council tax band, floor area, key features, nearest stations, and floorplan URLs.
@@ -542,6 +552,22 @@ async def rightmove_listing(
         summary += f", {result.display_size}"
 
     return _result(summary, data)
+
+
+@mcp.resource(
+    "listing://{property_id}",
+    description=(
+        "Full details for a Rightmove property listing. "
+        "property_id may be a full Rightmove URL or numeric ID (e.g. '12345678'). "
+        "Use rightmove_search to discover IDs, then read this resource for full detail."
+    ),
+    mime_type="application/json",
+)
+async def get_listing_resource(property_id: str) -> str:
+    from property_core.rightmove_scraper import fetch_listing
+
+    result = await anyio.to_thread.run_sync(partial(fetch_listing, property_id))
+    return json.dumps(_slim(result.model_dump(mode="json")), default=str)
 
 
 @mcp.tool()
@@ -647,13 +673,13 @@ async def planning_search(
 async def company_search(
     query: str,
 ) -> ToolResult:
-    """Search Companies House for a UK company by name or number.
+    """Search Companies House by company name. Returns a list of matches.
 
-    If query looks like a company number (e.g. "00445790", "SC123456"),
-    fetches directly. Otherwise searches by name.
+    For a direct lookup by company number, use the company://{company_number}
+    resource instead (e.g. read_resource("company://00445790")).
 
     Args:
-        query: Company name (e.g. "Tesco") or number (e.g. "00445790")
+        query: Company name to search (e.g. "Tesco", "Rightmove plc")
     """
     from property_core.companies_house_client import CompaniesHouseClient
 
@@ -661,16 +687,32 @@ async def company_search(
     if not client.is_configured():
         return ToolResult(content="Companies House not configured (set COMPANIES_HOUSE_API_KEY)")
 
-    result = await anyio.to_thread.run_sync(partial(client.lookup, query))
+    result = await anyio.to_thread.run_sync(partial(client.search, query))
     data = result.model_dump(mode="json")
-
-    # CompanyRecord has company_name; CompanySearchResult has total_results
-    if hasattr(result, "company_name"):
-        summary = f"{result.company_name} ({result.company_status})"
-    else:
-        summary = f"Found {result.total_results} companies for '{query}'"
+    summary = f"Found {result.total_results} companies for '{query}'"
 
     return _result(summary, data)
+
+
+@mcp.resource(
+    "company://{company_number}",
+    description=(
+        "Companies House record for a specific company number (e.g. '00445790'). "
+        "Use company_search to find a company number by name, then read this resource "
+        "for the full profile including officers and filing history."
+    ),
+    mime_type="application/json",
+)
+async def get_company_resource(company_number: str) -> str:
+    from property_core.companies_house_client import CompaniesHouseClient
+
+    client = CompaniesHouseClient()
+    if not client.is_configured():
+        return json.dumps({"error": "Companies House not configured (set COMPANIES_HOUSE_API_KEY)"})
+    result = await anyio.to_thread.run_sync(partial(client.get_company, company_number))
+    if result is None:
+        return json.dumps({"error": f"Company {company_number!r} not found"})
+    return json.dumps(_slim(result.model_dump(mode="json")), default=str)
 
 
 # ---------------------------------------------------------------------------
@@ -691,6 +733,16 @@ def main():
         kwargs["port"] = int(os.environ.get("FASTMCP_PORT", "8080"))
 
     mcp.run(transport=transport, **kwargs)
+
+
+# Tool-only clients (Claude.ai Apps, ChatGPT) can reach resources via generated tools
+mcp.add_transform(ResourcesAsTools(mcp))
+
+# 1h cache for all read-only surfaces — property data is stable enough
+mcp.add_middleware(ResponseCachingMiddleware(
+    read_resource_settings=ReadResourceSettings(ttl=3600),
+    call_tool_settings=CallToolSettings(ttl=3600),
+))
 
 
 if __name__ == "__main__":
