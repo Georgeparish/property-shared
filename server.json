@@ -11,5 +11,14 @@
   },
   "remotes": [
     { "type": "streamable-http", "url": "https://property-shared.fly.dev/mcp" }
+  ],
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "property-shared",
+      "version": "1.5.0",
+      "runtimeHint": "uvx",
+      "transport": { "type": "stdio" }
+    }
   ]
 }
