@@ -79,6 +79,13 @@ def create_app() -> FastAPI:
     app.include_router(api_router)
     app.include_router(demo_router)
 
+    @app.get("/.well-known/glama.json", include_in_schema=False)
+    async def glama_connector_manifest():
+        return {
+            "$schema": "https://glama.ai/mcp/schemas/connector.json",
+            "maintainers": [{"email": "paulboucherat@gmail.com"}],
+        }
+
     from app.core.metrics import setup_metrics
     setup_metrics(app)
 
