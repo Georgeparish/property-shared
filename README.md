@@ -1,5 +1,7 @@
 # Property Shared
 
+<!-- mcp-name: io.github.paulieb89/property-shared -->
+
 UK property data in one package. Pulls Land Registry sales, EPC certificates, Rightmove listings, rental yields, stamp duty calculations, planning portal links, and Companies House records.
 
 Use it as a **Python library**, **CLI**, **HTTP API**, or **MCP server for AI agents**.
