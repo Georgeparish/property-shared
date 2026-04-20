@@ -2,6 +2,8 @@
 
 <!-- mcp-name: io.github.paulieb89/property-shared -->
 
+[![property-shared MCP server](https://glama.ai/mcp/servers/paulieb89/property-shared/badges/card.svg)](https://glama.ai/mcp/servers/paulieb89/property-shared)
+
 UK property data in one package. Pulls Land Registry sales, EPC certificates, Rightmove listings, rental yields, stamp duty calculations, planning portal links, and Companies House records.
 
 Use it as a **Python library**, **CLI**, **HTTP API**, or **MCP server for AI agents**.
