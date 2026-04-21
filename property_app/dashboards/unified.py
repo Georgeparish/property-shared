@@ -24,6 +24,7 @@ async def _fetch_unified(
     search_level: str = "sector",
     property_type: str | None = None,
     radius: float = 0.5,
+    limit: int = 10,
 ) -> dict:
     """Fetch comps, yield, and rental data in parallel."""
     from property_core import PPDService, calculate_yield
@@ -39,6 +40,7 @@ async def _fetch_unified(
             months=months,
             search_level=search_level,
             property_type=property_type,
+            limit=limit,
         ),
         calculate_yield(
             postcode=postcode,
@@ -85,11 +87,15 @@ async def get_property_data(
     search_level: Annotated[str, Field(description="postcode, sector, or district")] = "sector",
     property_type: Annotated[str | None, Field(description="F=flat, D=detached, S=semi, T=terrace")] = None,
     radius: Annotated[float, Field(description="Rental search radius in miles", ge=0.1, le=5.0)] = 0.5,
+    limit: Annotated[int, Field(description="Max transactions to return (default 10 for LLM context efficiency; increase if you need more detail)", ge=1, le=50)] = 10,
 ) -> dict:
     """Combined property data: comparable sales, rental yield, and rental market.
 
     Returns transaction count, price stats, gross yield percentage,
     yield assessment, rental listings, and data quality classification.
+
+    The default limit of 10 transactions keeps responses ~4k tokens. Raise to 30+
+    only when you need the full transaction list for detailed analysis.
     """
     return await _fetch_unified(
         postcode=postcode,
@@ -97,6 +103,7 @@ async def get_property_data(
         search_level=search_level,
         property_type=property_type,
         radius=radius,
+        limit=limit,
     )
 
 
@@ -166,12 +173,14 @@ async def property_dashboard(
     from property_app.dashboards.comps import _build_address, _build_price_buckets, _TYPE_LABELS
     from property_app.formatting import fmt_date, fmt_gbp, fmt_pct
 
+    # Dashboard renders DataTable with pagination, so fetch more rows for drill-down.
     data = await _fetch_unified(
         postcode=postcode,
         months=months,
         search_level=search_level,
         property_type=property_type,
         radius=radius,
+        limit=30,
     )
 
     comps = data["comps"]
