@@ -17,7 +17,6 @@ from fastmcp.server.middleware.caching import (
     ReadResourceSettings,
     ResponseCachingMiddleware,
 )
-from fastmcp.server.transforms import ResourcesAsTools
 from fastmcp.tools.tool import ToolResult
 
 
@@ -56,13 +55,13 @@ mcp = FastMCP(
         "one call). For postcode-only queries, use property_comps (comparable "
         "sales with EPC-enriched price/sqft) and property_yield separately. "
         "ppd_transactions for specific property history or filtered searches, "
-        "rightmove_search to browse current listings for sale or rent, then read "
-        "listing://{property_id} resource for full detail on a specific listing. "
+        "rightmove_search to browse current listings for sale or rent, then "
+        "rightmove_listing for full detail on a specific listing. "
         "property_epc for energy certificates (needs street address for exact "
         "match). rental_analysis for rental market figures, stamp_duty for SDLT, "
         "property_blocks for block-buy opportunities, planning_search for council "
-        "planning portals, company_search to find a company by name, then read "
-        "company://{company_number} resource for the full profile. "
+        "planning portals, company_search to find a company by name, then "
+        "company_profile for the full profile. "
         "For structured investment reports and property analysis skills, "
         "see https://bouch.dev/products "
     ),
@@ -526,7 +525,7 @@ async def rightmove_search(
 async def rightmove_listing(
     property_id: str,
 ) -> ToolResult:
-    """Fetch a Rightmove listing by ID. Prefer the listing://{property_id} resource instead.
+    """Fetch full details for a Rightmove listing by ID or URL.
 
     Returns price, tenure, lease years remaining, service charge, ground rent,
     council tax band, floor area, key features, nearest stations, and floorplan URLs.
@@ -552,22 +551,6 @@ async def rightmove_listing(
         summary += f", {result.display_size}"
 
     return _result(summary, data)
-
-
-@mcp.resource(
-    "listing://{property_id}",
-    description=(
-        "Full details for a Rightmove property listing. "
-        "property_id may be a full Rightmove URL or numeric ID (e.g. '12345678'). "
-        "Use rightmove_search to discover IDs, then read this resource for full detail."
-    ),
-    mime_type="application/json",
-)
-async def get_listing_resource(property_id: str) -> str:
-    from property_core.rightmove_scraper import fetch_listing
-
-    result = await anyio.to_thread.run_sync(partial(fetch_listing, property_id))
-    return json.dumps(_slim(result.model_dump(mode="json")), default=str)
 
 
 @mcp.tool()
@@ -694,25 +677,27 @@ async def company_search(
     return _result(summary, data)
 
 
-@mcp.resource(
-    "company://{company_number}",
-    description=(
-        "Companies House record for a specific company number (e.g. '00445790'). "
-        "Use company_search to find a company number by name, then read this resource "
-        "for the full profile including officers and filing history."
-    ),
-    mime_type="application/json",
-)
-async def get_company_resource(company_number: str) -> str:
+@mcp.tool()
+async def company_profile(company_number: str) -> ToolResult:
+    """Get the full Companies House record for a company by number.
+
+    Returns registered address, status, incorporation date, officers, and
+    filing history. Use company_search to find a company number by name.
+
+    Args:
+        company_number: Companies House number (e.g. '00445790').
+    """
     from property_core.companies_house_client import CompaniesHouseClient
 
     client = CompaniesHouseClient()
     if not client.is_configured():
-        return json.dumps({"error": "Companies House not configured (set COMPANIES_HOUSE_API_KEY)"})
+        return ToolResult(content="Companies House not configured (set COMPANIES_HOUSE_API_KEY)")
     result = await anyio.to_thread.run_sync(partial(client.get_company, company_number))
     if result is None:
-        return json.dumps({"error": f"Company {company_number!r} not found"})
-    return json.dumps(_slim(result.model_dump(mode="json")), default=str)
+        return ToolResult(content=f"Company {company_number!r} not found")
+    data = _slim(result.model_dump(mode="json"))
+    summary = result.company_name or company_number
+    return _result(summary, data)
 
 
 # ---------------------------------------------------------------------------
@@ -734,9 +719,6 @@ def main():
 
     mcp.run(transport=transport, **kwargs)
 
-
-# Tool-only clients (Claude.ai Apps, ChatGPT) can reach resources via generated tools
-mcp.add_transform(ResourcesAsTools(mcp))
 
 # 1h cache for all read-only surfaces — property data is stable enough
 mcp.add_middleware(ResponseCachingMiddleware(

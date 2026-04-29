@@ -11,8 +11,6 @@ from fastmcp.server.middleware.caching import (
     ReadResourceSettings,
     ResponseCachingMiddleware,
 )
-from fastmcp.server.transforms import ResourcesAsTools
-
 # Main server — all tools registered directly via @mcp.tool()
 mcp = FastMCP(
     "property-app",
@@ -23,8 +21,7 @@ mcp = FastMCP(
         "Use comps_dashboard, yield_dashboard, rental_dashboard, listings_dashboard for focused single-topic views. "
         "Use search_comps, get_yield, get_rental for raw data. "
         "Use stamp_duty, planning_search, epc_lookup, rightmove_search for quick lookups. "
-        "Use company_search to find a company by name, then read company://{company_number} "
-        "resource for the full profile."
+        "Use company_search to find a company by name."
     ),
 )
 
@@ -72,9 +69,6 @@ def main() -> None:
         kwargs["stateless_http"] = True
     mcp.run(transport=transport, **kwargs)
 
-
-# Tool-only clients can reach resources via generated list_resources / read_resource tools
-mcp.add_transform(ResourcesAsTools(mcp))
 
 # 1h cache for read-only surfaces
 mcp.add_middleware(ResponseCachingMiddleware(
