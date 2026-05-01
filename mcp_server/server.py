@@ -720,10 +720,10 @@ def main():
     mcp.run(transport=transport, **kwargs)
 
 
-# 1h cache for all read-only surfaces — property data is stable enough
+# 5 min cache — 1h caused OOM on 1GB machine under burst load (unbounded in-memory cache)
 mcp.add_middleware(ResponseCachingMiddleware(
-    read_resource_settings=ReadResourceSettings(ttl=3600),
-    call_tool_settings=CallToolSettings(ttl=3600),
+    read_resource_settings=ReadResourceSettings(ttl=300),
+    call_tool_settings=CallToolSettings(ttl=300),
 ))
 
 
