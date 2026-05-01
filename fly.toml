@@ -12,9 +12,9 @@ primary_region = "lhr"  # London - best for UK council sites
   PORT = "8080"
   FASTMCP_STATELESS_HTTP = "true"
 
-# Planning scraper needs more memory for Playwright/Chromium
+# 2GB RAM — 1GB OOM-killed under burst MCP load (unbounded in-memory cache)
 [[vm]]
-  memory = "1gb"
+  memory = "2gb"
   cpu_kind = "shared"
   cpus = 1
 
