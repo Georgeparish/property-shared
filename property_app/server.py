@@ -33,6 +33,23 @@ async def health(request):  # noqa: ARG001
     return JSONResponse({"status": "ok"})
 
 
+@mcp.custom_route("/.well-known/glama.json", methods=["GET"])
+async def glama_claim(request):
+    from starlette.responses import JSONResponse
+
+    return JSONResponse({
+        "$schema": "https://glama.ai/mcp/schemas/connector.json",
+        "maintainers": [{"email": "paul@bouch.dev"}],
+    })
+
+
+@mcp.custom_route("/.well-known/mcp/server-card.json", methods=["GET"])
+async def smithery_server_card(request):
+    from starlette.responses import JSONResponse
+
+    return JSONResponse({"serverInfo": {"name": "property-app", "version": "1.5.2"}})
+
+
 @mcp.custom_route("/img", methods=["GET"])
 async def proxy_image(request):
     """Proxy external images through our domain to avoid CSP blocks."""

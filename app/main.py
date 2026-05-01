@@ -83,7 +83,7 @@ def create_app() -> FastAPI:
     async def glama_connector_manifest():
         return {
             "$schema": "https://glama.ai/mcp/schemas/connector.json",
-            "maintainers": [{"email": "paulboucherat@gmail.com"}],
+            "maintainers": [{"email": "paul@bouch.dev"}],
         }
 
     from app.core.metrics import setup_metrics
