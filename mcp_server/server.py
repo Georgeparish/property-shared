@@ -305,9 +305,18 @@ async def property_yield(
 
     summary = f"Yield analysis for {postcode}"
     if result.gross_yield_pct is not None:
-        summary += f": {result.gross_yield_pct:.1f}% gross yield"
-        summary += f" ({data['yield_assessment']})"
-    summary += f", data quality: {data['data_quality']}"
+        summary += f": {result.gross_yield_pct:.1f}% gross yield ({data['yield_assessment']})"
+        summary += f", data quality: {data['data_quality']}"
+    elif result.rental_count == 0:
+        summary += f": no rental listings within {radius} miles"
+        data["rental_note"] = (
+            f"No rental listings found at {radius} mile radius. "
+            f"Try property_yield with a wider radius, or use rental_analysis "
+            f"which auto-escalates up to 1.5 miles."
+        )
+        summary += " — try wider radius or use rental_analysis (auto-escalates)"
+    else:
+        summary += f", data quality: {data['data_quality']}"
 
     return _result(summary, data)
 

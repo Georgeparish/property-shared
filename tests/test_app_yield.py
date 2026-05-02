@@ -118,3 +118,30 @@ def test_yield_importable():
 
     assert get_yield is not None
     assert yield_dashboard is not None
+
+
+def test_yield_dashboard_forwards_property_type():
+    """yield_dashboard forwards property_type to _fetch_yield."""
+    from property_app.dashboards.yield_view import yield_dashboard
+
+    with patch(
+        "property_app.dashboards.yield_view._fetch_yield",
+        return_value=MOCK_YIELD_DATA,
+    ) as mock_fetch:
+        asyncio.run(yield_dashboard(postcode="NG1 1AA", property_type="F"))
+
+    mock_fetch.assert_called_once()
+    assert mock_fetch.call_args.kwargs["property_type"] == "F"
+
+
+def test_yield_dashboard_property_type_defaults_none():
+    """yield_dashboard defaults property_type to None when omitted."""
+    from property_app.dashboards.yield_view import yield_dashboard
+
+    with patch(
+        "property_app.dashboards.yield_view._fetch_yield",
+        return_value=MOCK_YIELD_DATA,
+    ) as mock_fetch:
+        asyncio.run(yield_dashboard(postcode="NG1 1AA"))
+
+    assert mock_fetch.call_args.kwargs["property_type"] is None

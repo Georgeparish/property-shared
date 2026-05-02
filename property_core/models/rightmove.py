@@ -138,7 +138,7 @@ class RightmoveListing(BaseModel):
     students: Optional[bool] = None
     transaction_type: Optional[str] = None  # "rent" or "buy"
     # Raw __NEXT_DATA__ property dict (populated when include_raw=True)
-    raw: Optional[dict[str, Any]] = None
+    raw: Optional[dict[str, Any]] = Field(default=None, exclude=True)
 
     @classmethod
     def from_next_data(cls, data: Dict[str, Any]) -> RightmoveListing:
@@ -226,7 +226,7 @@ class RightmoveListingDetail(BaseModel):
     price_frequency: Optional[str] = None
     transaction_type: Optional[str] = None
     # Raw PAGE_MODEL.propertyData dict (populated when include_raw=True)
-    raw: Optional[dict[str, Any]] = None
+    raw: Optional[dict[str, Any]] = Field(default=None, exclude=True)
 
     @classmethod
     def from_page_model(cls, data: Dict[str, Any], url: str) -> RightmoveListingDetail:

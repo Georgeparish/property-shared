@@ -109,7 +109,8 @@ async def yield_dashboard(
     postcode: Annotated[str, Field(description="UK postcode e.g. NG1 1AA")],
     months: Annotated[int, Field(description="Sale lookback months", ge=1, le=60)] = 24,
     search_level: Annotated[str, Field(description="postcode, sector, or district")] = "sector",
-    radius: Annotated[float, Field(description="Rental search radius in miles")] = 0.5,
+    property_type: Annotated[str | None, Field(description="F=flat, D=detached, S=semi, T=terrace")] = None,
+    radius: Annotated[float, Field(description="Rental search radius in miles", ge=0.1, le=5.0)] = 0.5,
 ):
     """Show rental yield analysis as an interactive dashboard.
 
@@ -134,6 +135,7 @@ async def yield_dashboard(
         postcode=postcode,
         months=months,
         search_level=search_level,
+        property_type=property_type,
         radius=radius,
     )
 

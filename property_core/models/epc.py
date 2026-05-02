@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # --- Helpers ---
@@ -90,7 +90,7 @@ class EPCData(BaseModel):
     mains_gas: str | None = None
 
     # Raw API response dict (populated by from_api_row)
-    raw: dict[str, Any] | None = None
+    raw: dict[str, Any] | None = Field(default=None, exclude=True)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

@@ -95,7 +95,7 @@ class PPDTransaction(BaseModel):
     epc_construction_age: Optional[str] = None
     epc_built_form: Optional[str] = None
     # Raw SPARQL binding dict (populated by from_sparql_binding)
-    raw: Optional[dict[str, Any]] = None
+    raw: Optional[dict[str, Any]] = Field(default=None, exclude=True)
 
     @classmethod
     def from_sparql_binding(cls, binding: Dict[str, Any]) -> PPDTransaction:
@@ -231,7 +231,7 @@ class PPDTransactionRecord(BaseModel):
     record_status_uri: Optional[str] = None
     source_url: Optional[str] = None
     # Raw Linked Data API response dict (populated by from_linked_data)
-    raw: Optional[dict[str, Any]] = None
+    raw: Optional[dict[str, Any]] = Field(default=None, exclude=True)
 
     @classmethod
     def from_linked_data(cls, raw: Dict[str, Any]) -> PPDTransactionRecord:

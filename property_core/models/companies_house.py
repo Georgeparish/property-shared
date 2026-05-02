@@ -12,7 +12,7 @@ class CompanyOfficer(BaseModel):
     name: str | None = None
     role: str | None = None
     appointed: str | None = None
-    raw: dict[str, Any] | None = None
+    raw: dict[str, Any] | None = Field(default=None, exclude=True)
 
     @classmethod
     def from_api_response(cls, data: dict[str, Any]) -> CompanyOfficer:
@@ -34,7 +34,7 @@ class CompanyRecord(BaseModel):
     registered_office: dict[str, Any] | None = None
     sic_codes: list[str] = Field(default_factory=list)
     officers: list[CompanyOfficer] = Field(default_factory=list)
-    raw: dict[str, Any] | None = None
+    raw: dict[str, Any] | None = Field(default=None, exclude=True)
 
     @classmethod
     def from_api_response(
@@ -67,7 +67,7 @@ class CompanySearchItem(BaseModel):
     company_type: str | None = None
     date_of_creation: str | None = None
     address_snippet: str | None = None
-    raw: dict[str, Any] | None = None
+    raw: dict[str, Any] | None = Field(default=None, exclude=True)
 
     @classmethod
     def from_api_response(cls, data: dict[str, Any]) -> CompanySearchItem:
