@@ -1,16 +1,15 @@
-"""Prometheus metrics instrumentation for the FastAPI app."""
+"""Prometheus metrics endpoint for the FastAPI app."""
 
 from __future__ import annotations
 
 from fastapi import FastAPI
-from prometheus_fastapi_instrumentator import Instrumentator
+from fastapi.responses import Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 
 def setup_metrics(app: FastAPI) -> None:
-    """Instrument the app with Prometheus metrics and expose /metrics."""
-    Instrumentator(
-        should_group_status_codes=False,
-        should_ignore_untemplated=True,
-        excluded_handlers=["/metrics", "/mcp"],
-        inprogress_labels=True,
-    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+    """Expose /metrics endpoint backed by the global prometheus-client registry."""
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics_endpoint() -> Response:
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

@@ -1,6 +1,6 @@
 [project]
 name = "property-shared"
-version = "1.6.0"
+version = "1.6.1"
 description = "UK property data MCP server and API — Land Registry comparable sales, Rightmove listings, EPC certificates, rental analysis, and stamp duty."
 readme = "README.md"
 license = "MIT"
@@ -57,7 +57,7 @@ dev = [
 api = [
   "fastapi>=0.128.0",
   "uvicorn>=0.40.0",
-  "prometheus-fastapi-instrumentator>=7.0.0",
+  "prometheus-client==0.24.1",
 ]
 cli = [
   "typer>=0.9.0",

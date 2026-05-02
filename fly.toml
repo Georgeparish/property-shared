@@ -39,3 +39,6 @@ primary_region = "lhr"  # London - best for UK council sites
     method = "GET"
     path = "/v1/health"
 
+[metrics]
+  port = 8080
+  path = "/metrics"

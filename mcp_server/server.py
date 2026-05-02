@@ -6,18 +6,60 @@ Run:  uv run property-mcp
 from __future__ import annotations
 
 import json
+import os
+import time
 from functools import partial
 from statistics import median as stat_median
 from typing import Any, Optional
 
 import anyio
 from fastmcp import FastMCP
+from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.middleware.caching import (
     CallToolSettings,
     ReadResourceSettings,
     ResponseCachingMiddleware,
 )
 from fastmcp.tools.tool import ToolResult
+from prometheus_client import CONTENT_TYPE_LATEST, Counter as PromCounter, Histogram, generate_latest
+
+# ---------------------------------------------------------------------------
+# Prometheus metrics
+# ---------------------------------------------------------------------------
+
+TRANSPORT = os.getenv("FASTMCP_TRANSPORT", "http")
+REGION = os.getenv("FLY_REGION", "local")
+
+tool_calls_total = PromCounter(
+    "property_shared_tool_calls_total",
+    "Count of MCP tool invocations.",
+    labelnames=["tool", "transport", "region", "status"],
+)
+tool_duration_seconds = Histogram(
+    "property_shared_tool_duration_seconds",
+    "Tool invocation latency in seconds.",
+    labelnames=["tool", "transport", "region"],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
+)
+
+
+class PrometheusMiddleware(Middleware):
+    """Emit fleet-standard Prometheus metrics on every tool call."""
+
+    async def on_call_tool(self, context: MiddlewareContext, call_next):
+        tool_name = context.message.name
+        t0 = time.perf_counter()
+        try:
+            result = await call_next(context)
+            tool_calls_total.labels(tool_name, TRANSPORT, REGION, "ok").inc()
+            return result
+        except BaseException:
+            tool_calls_total.labels(tool_name, TRANSPORT, REGION, "error").inc()
+            raise
+        finally:
+            tool_duration_seconds.labels(tool_name, TRANSPORT, REGION).observe(
+                time.perf_counter() - t0
+            )
 
 
 def _slim(obj: Any) -> Any:
@@ -49,6 +91,7 @@ def _result(summary: str, data: dict) -> ToolResult:
 
 mcp = FastMCP(
     "property-server",
+    middleware=[PrometheusMiddleware()],
     instructions=(
         "UK property data tools. Use property_report for a full data pull when "
         "you have a street address + postcode (comps + EPC + yield + market in "
@@ -715,8 +758,6 @@ async def company_profile(company_number: str) -> ToolResult:
 
 
 def main():
-    import os
-
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
     if transport not in ("stdio", "sse", "http"):
         transport = "stdio"
