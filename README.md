@@ -6,7 +6,9 @@
 
 UK property data in one package. Pulls Land Registry sales, EPC certificates, Rightmove listings, rental yields, stamp duty calculations, planning portal links, and Companies House records.
 
-Use it as a **Python library**, **CLI**, **HTTP API**, or **MCP server for AI agents**.
+Use it as a **Python library**, **CLI**, or **HTTP API**.
+
+> **MCP server moved:** The MCP server is now [`uk-property-mcp`](https://github.com/paulieb89/uk-property-mcp) — install with `pip install uk-property-mcp`. The old endpoint `https://property-shared.fly.dev/mcp` still works via a proxy for now.
 
 ## What You Get
 
@@ -99,21 +101,6 @@ property-cli report generate "10 Downing Street, SW1A 2AA" --property-type F
 
 Add `--api-url http://localhost:8000` to any command to route through the HTTP API instead of calling core directly.
 
-## Use as MCP Server (AI Agents)
-
-For Claude.ai, Claude Code, ChatGPT, or any MCP-compatible host.
-
-```bash
-pip install uk-property-mcp
-property-mcp  # starts stdio transport
-# or without installing:
-uvx uk-property-mcp
-```
-
-12 tools available: `property_report`, `property_comps`, `ppd_transactions`, `property_yield`, `rental_analysis`, `property_epc`, `rightmove_search`, `rightmove_listing`, `property_blocks`, `stamp_duty`, `planning_search`, `company_search`.
-
-Remote server deployed at `https://property-shared.fly.dev/mcp` (Streamable HTTP).
-
 ## Use as HTTP API
 
 ```bash
@@ -165,15 +152,16 @@ RUN_LIVE_TESTS=1 uv run --extra dev pytest -v
 
 ## Architecture
 
-Three-layer separation — core stays framework-agnostic:
+Four-layer separation — core stays framework-agnostic:
 
 ```
 property_core/     Pure Python library (all business logic)
 app/               FastAPI wrapper (thin HTTP layer)
 property_cli/      Typer CLI (thin CLI layer)
+property_app/      MCP App with Prefab UI dashboards (propertydata.fly.dev/mcp)
 ```
 
-All three consumers import directly from `property_core`. No adapter layers.
+All four consumers import directly from `property_core`. No adapter layers.
 
 ## Deploy (Fly.io)
 
