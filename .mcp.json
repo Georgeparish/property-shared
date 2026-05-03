@@ -1,9 +1,8 @@
 {
   "mcpServers": {
     "property": {
-      "command": "uv",
-      "args": ["run", "--extra", "mcp", "property-mcp"],
-      "env": {}
+      "command": "uvx",
+      "args": ["uk-property-mcp"]
     },
     "openaiDeveloperDocs": {
       "type": "http",

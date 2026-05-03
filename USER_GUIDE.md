@@ -415,8 +415,15 @@ company = ch.get_company("00445790")  # fetch by number, includes officers
 The MCP server exposes all property_core tools to AI hosts like Claude, ChatGPT, and Claude Code.
 
 ### Running locally
+Install `uk-property-mcp` (the canonical MCP server package):
 ```bash
-cd mcp_server && uv run property-mcp
+pip install uk-property-mcp
+MCP_TRANSPORT=http property-mcp
+```
+
+Or via uvx without installation:
+```bash
+uvx uk-property-mcp
 ```
 
 ### Connecting from Claude Code
@@ -425,20 +432,32 @@ Add to your `.mcp.json`:
 {
   "mcpServers": {
     "property": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/property_shared/mcp_server", "property-mcp"]
+      "type": "http",
+      "url": "https://property-shared.fly.dev/mcp"
     }
   }
 }
 ```
 
-### Connecting via SSE (remote / Fly.io)
+For a local stdio connection:
 ```json
 {
   "mcpServers": {
     "property": {
-      "type": "sse",
-      "url": "https://your-app.fly.dev/sse"
+      "command": "uvx",
+      "args": ["uk-property-mcp"]
+    }
+  }
+}
+```
+
+### Connecting via HTTP (remote / Fly.io)
+```json
+{
+  "mcpServers": {
+    "property": {
+      "type": "http",
+      "url": "https://property-shared.fly.dev/mcp"
     }
   }
 }

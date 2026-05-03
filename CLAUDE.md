@@ -39,11 +39,11 @@ uv run --extra cli property-cli analysis rental "NG1 1AA"
 uv run --extra cli property-cli ppd comps "SW1A 1AA" --api-url http://localhost:8000
 
 # Tests
-uv run --extra dev pytest                        # unit tests (mocked)
-RUN_LIVE_TESTS=1 uv run --extra dev pytest       # live network tests
+uv run --extra dev --extra apps pytest                        # unit tests (mocked)
+RUN_LIVE_TESTS=1 uv run --extra dev --extra apps pytest       # live network tests
 
 # Single test
-uv run --extra dev pytest tests/test_ppd_service_live.py -v
+uv run --extra dev --extra apps pytest tests/test_ppd_service_live.py -v
 ```
 
 ## Architecture

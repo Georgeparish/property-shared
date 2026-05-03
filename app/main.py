@@ -25,8 +25,7 @@ def _setup_mcp() -> None:
     """Prepare MCP HTTP ASGI app (optional)."""
     global _mcp_app
     try:
-        from mcp_server.server import mcp as mcp_server
-
+        from property_mcp.server import mcp as mcp_server
         _mcp_app = mcp_server.http_app(path="/mcp")
     except ImportError:
         pass
