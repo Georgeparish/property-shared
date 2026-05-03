@@ -204,8 +204,8 @@ async def property_dashboard(
     rental_count = rental.get("rental_listings_count", 0)
     median_rent = rental.get("median_rent_monthly")
     avg_rent = rental.get("average_rent_monthly")
-    min_rent = rental.get("min_rent")
-    max_rent = rental.get("max_rent")
+    min_rent = rental.get("rent_range_low")
+    max_rent = rental.get("rent_range_high")
     thin_rental = rental.get("thin_market", False)
 
     # -- Computed values --
