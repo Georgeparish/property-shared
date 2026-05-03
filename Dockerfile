@@ -26,7 +26,6 @@ RUN uv sync --frozen --no-dev --extra api --extra mcp
 # Copy application code
 COPY app ./app
 COPY property_core ./property_core
-COPY mcp_server ./mcp_server
 
 EXPOSE 8080
 
