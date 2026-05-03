@@ -34,12 +34,12 @@ pip install property-shared
 uv add property-shared
 ```
 
-Extras: `[mcp]` for MCP server, `[cli]` for CLI, `[api]` for HTTP server, `[dev]` for tests.
+Extras: `[cli]` for CLI, `[api]` for HTTP server, `[dev]` for tests.
 
 ```bash
-pip install property-shared[mcp,cli]
+pip install property-shared[cli]
 # or
-uv add property-shared --extra mcp --extra cli
+uv add property-shared --extra cli
 ```
 
 ## Use as a Python Library
@@ -104,15 +104,15 @@ Add `--api-url http://localhost:8000` to any command to route through the HTTP A
 For Claude.ai, Claude Code, ChatGPT, or any MCP-compatible host.
 
 ```bash
-pip install property-shared[mcp]  # or: uv add property-shared --extra mcp
+pip install uk-property-mcp
 property-mcp  # starts stdio transport
+# or without installing:
+uvx uk-property-mcp
 ```
 
 12 tools available: `property_report`, `property_comps`, `ppd_transactions`, `property_yield`, `rental_analysis`, `property_epc`, `rightmove_search`, `rightmove_listing`, `property_blocks`, `stamp_duty`, `planning_search`, `company_search`.
 
 Remote server deployed at `https://property-shared.fly.dev/mcp` (Streamable HTTP).
-
-See [mcp_server/README.md](mcp_server/README.md) for connection setup and tool details.
 
 ## Use as HTTP API
 
@@ -171,7 +171,6 @@ Three-layer separation — core stays framework-agnostic:
 property_core/     Pure Python library (all business logic)
 app/               FastAPI wrapper (thin HTTP layer)
 property_cli/      Typer CLI (thin CLI layer)
-mcp_server/        FastMCP wrapper (thin MCP layer for AI hosts)
 ```
 
 All three consumers import directly from `property_core`. No adapter layers.
