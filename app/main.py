@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import Any
 
+import httpx
 from fastapi import FastAPI
 from starlette.types import ASGIApp, Receive, Scope, Send
 import uvicorn
@@ -12,27 +13,55 @@ from app.web.routes import router as demo_router
 
 
 # ---------------------------------------------------------------------------
-# MCP integration (optional — requires mcp extra, uses FastMCP v3)
+# MCP proxy — forward /mcp to the canonical MCP server at propertydata.fly.dev
 #
 # Can't use app.mount("/mcp") — Starlette always 307-redirects /mcp → /mcp/
 # and neither Claude.ai nor ChatGPT follow 307 for POST requests.
 # Middleware routes /mcp directly without redirect.
 # ---------------------------------------------------------------------------
-_mcp_app: Any = None
+_MCP_UPSTREAM = "https://propertydata.fly.dev"
+_HOP_BY_HOP = frozenset([
+    b"host", b"transfer-encoding", b"connection", b"keep-alive",
+    b"proxy-authenticate", b"proxy-authorization", b"te", b"trailers", b"upgrade",
+])
 
 
-def _setup_mcp() -> None:
-    """Prepare MCP HTTP ASGI app (optional)."""
-    global _mcp_app
-    try:
-        from property_mcp.server import mcp as mcp_server
-        _mcp_app = mcp_server.http_app(path="/mcp")
-    except ImportError:
-        pass
+async def _mcp_proxy(scope: Scope, receive: Receive, send: Send) -> None:
+    """Proxy /mcp requests to the canonical MCP server at propertydata.fly.dev."""
+    path = scope["path"]
+    query = scope.get("query_string", b"").decode()
+    url = _MCP_UPSTREAM + path
+    if query:
+        url += f"?{query}"
+
+    body = b""
+    while True:
+        message = await receive()
+        body += message.get("body", b"")
+        if not message.get("more_body", False):
+            break
+
+    headers = {k: v for k, v in scope.get("headers", []) if k.lower() not in _HOP_BY_HOP}
+
+    async with httpx.AsyncClient() as client:
+        async with client.stream(
+            scope["method"], url, content=body, headers=headers, timeout=60.0
+        ) as response:
+            await send({
+                "type": "http.response.start",
+                "status": response.status_code,
+                "headers": [
+                    (k, v) for k, v in response.headers.raw
+                    if k.lower() not in {b"transfer-encoding"}
+                ],
+            })
+            async for chunk in response.aiter_bytes():
+                await send({"type": "http.response.body", "body": chunk, "more_body": True})
+            await send({"type": "http.response.body", "body": b"", "more_body": False})
 
 
 class MCPMiddleware:
-    """Route /mcp requests to the MCP app without Starlette mount redirect."""
+    """Route /mcp requests to the MCP proxy without Starlette mount redirect."""
 
     def __init__(self, app: ASGIApp, mcp_handler: Any) -> None:
         self.app = app
@@ -58,17 +87,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    _setup_mcp()
-
-    # Combine our lifespan with MCP's if available (required for session manager)
     app_lifespan = lifespan
-    if _mcp_app is not None:
-        try:
-            from fastmcp.utilities.lifespan import combine_lifespans
-            app_lifespan = combine_lifespans(lifespan, _mcp_app.lifespan)
-        except ImportError:
-            app_lifespan = _mcp_app.lifespan
-
     settings = get_settings()
     app = FastAPI(
         title=settings.app_name,
@@ -88,8 +107,7 @@ def create_app() -> FastAPI:
     from app.core.metrics import setup_metrics
     setup_metrics(app)
 
-    if _mcp_app is not None:
-        app.add_middleware(MCPMiddleware, mcp_handler=_mcp_app)
+    app.add_middleware(MCPMiddleware, mcp_handler=_mcp_proxy)
 
     return app
 
