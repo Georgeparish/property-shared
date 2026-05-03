@@ -9,12 +9,17 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # --- Helpers ---
 
+_EPC_DIRTY = frozenset({"NO DATA!", "INVALID!", "NO DATA", "INVALID", "VARIOUS", "UNKNOWN"})
+
+
 def _str_or_none(val: Any) -> Optional[str]:
-    """Return val as str, or None if empty/missing."""
+    """Return val as str, or None if empty/missing/dirty EPC sentinel."""
     if val is None:
         return None
-    s = str(val)
-    return s if s else None
+    s = str(val).strip()
+    if not s or s.upper() in _EPC_DIRTY:
+        return None
+    return s
 
 
 def _int_or_none(val: Any) -> Optional[int]:

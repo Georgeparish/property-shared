@@ -28,6 +28,15 @@ def _safe_float(val: Any) -> Optional[float]:
         return None
 
 
+_RM_BASE = "https://www.rightmove.co.uk"
+
+
+def _full_rm_url(path: str | None) -> str | None:
+    if not path:
+        return None
+    return f"{_RM_BASE}{path}" if path.startswith("/") else path
+
+
 def _round_distance(val: Any, decimals: int = 1) -> Optional[float]:
     """Round a distance value to specified decimal places."""
     if val is None:
@@ -162,7 +171,7 @@ class RightmoveListing(BaseModel):
             summary=data.get("summary"),
             property_type=data.get("propertyTypeFullDescription") or data.get("propertySubType"),
             agent_name=customer.get("branchDisplayName"),
-            agent_branch=customer.get("branchLandingPageUrl"),
+            agent_branch=_full_rm_url(customer.get("branchLandingPageUrl")),
             first_visible_date=data.get("firstVisibleDate"),
             images=_extract_images(data),
             latitude=_safe_float(location.get("latitude")),
