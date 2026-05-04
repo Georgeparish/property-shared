@@ -32,6 +32,7 @@ _BUILDING_TYPES = {
     "D": "detached",
     "S": "semi-detached",
     "T": "terraced",
+    "B": "bungalow",
 }
 
 
@@ -104,15 +105,31 @@ class RightmoveLocationAPI:
         *,
         property_type: str = "sale",
         building_type: str | None = None,
+        building_types: list[str] | None = None,
         min_price: int | None = None,
         max_price: int | None = None,
         min_bedrooms: int | None = None,
         max_bedrooms: int | None = None,
         radius: float | None = None,
         sort_by: str | None = None,
+        must_have: list[str] | None = None,
+        dont_show: list[str] | None = None,
         **extra_params,
     ) -> str:
-        """Build a Rightmove search URL from a postcode/outcode."""
+        """Build a Rightmove search URL from a postcode/outcode.
+
+        Args:
+            postcode: UK postcode or outcode (e.g. "NW3", "SW1A 1AA").
+            property_type: "sale" or "rent".
+            building_type: Single PPD building code — F/D/S/T/B.
+            building_types: Multiple PPD building codes (overrides building_type).
+            min_price / max_price: Price range in GBP.
+            min_bedrooms / max_bedrooms: Bedroom range.
+            radius: Search radius in miles.
+            sort_by: newest | oldest | price_low | price_high | most_reduced.
+            must_have: Rightmove mustHave features, e.g. ["garden", "parking"].
+            dont_show: Rightmove dontShow features, e.g. ["newHome", "sharedOwnership"].
+        """
         location_identifier = self.lookup_postcode(postcode)
         if not location_identifier:
             raise LocationLookupError(
@@ -127,25 +144,40 @@ class RightmoveLocationAPI:
         property_path = self.PROPERTY_TYPES.get(property_type, "property-for-sale")
         base_url = f"https://www.rightmove.co.uk/{property_path}/find.html"
 
-        params: dict[str, object] = {"locationIdentifier": location_identifier}
+        # Use a list of tuples to support repeated keys (propertyTypes, mustHave[], etc.)
+        params: list[tuple[str, object]] = [("locationIdentifier", location_identifier)]
+
         if min_price is not None:
-            params["minPrice"] = min_price
+            params.append(("minPrice", min_price))
         if max_price is not None:
-            params["maxPrice"] = max_price
+            params.append(("maxPrice", max_price))
         if min_bedrooms is not None:
-            params["minBedrooms"] = min_bedrooms
+            params.append(("minBedrooms", min_bedrooms))
         if max_bedrooms is not None:
-            params["maxBedrooms"] = max_bedrooms
+            params.append(("maxBedrooms", max_bedrooms))
         if radius is not None:
-            params["radius"] = radius
+            params.append(("radius", radius))
         if sort_by:
             code = _SORT_TYPES.get(sort_by)
             if code is not None:
-                params["sortType"] = code
-        if building_type:
-            rm_type = _BUILDING_TYPES.get(building_type.upper())
-            if rm_type:
-                params["propertyTypes"] = rm_type
+                params.append(("sortType", code))
 
-        params.update(extra_params)
+        # Resolve building type(s) — building_types takes precedence over building_type
+        resolved_types: list[str] = []
+        for code in (building_types or ([building_type] if building_type else [])):
+            rm_type = _BUILDING_TYPES.get(code.upper())
+            if rm_type:
+                resolved_types.append(rm_type)
+        for rm_type in resolved_types:
+            params.append(("propertyTypes", rm_type))
+
+        # Rightmove bracket-notation list params
+        for feature in (must_have or []):
+            params.append(("mustHave[]", feature))
+        for feature in (dont_show or []):
+            params.append(("dontShow[]", feature))
+
+        for k, v in extra_params.items():
+            params.append((k, v))
+
         return f"{base_url}?{urlencode(params)}"
