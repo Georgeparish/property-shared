@@ -225,7 +225,6 @@ def _search_all_outcodes(
                 building_types=HOUSE_BUILDING_TYPES,
                 max_price=MAX_PRICE,
                 min_bedrooms=MIN_BEDROOMS,
-                must_have=["garden"],
                 dont_show=["newHome", "sharedOwnership", "retirement"],
                 sort_by="newest",
             )
@@ -234,7 +233,7 @@ def _search_all_outcodes(
             continue
 
         try:
-            listings = fetch_listings(url, max_pages=1)
+            listings = fetch_listings(url, max_pages=2)
         except RightmoveError as exc:
             print(f"fetch failed: {exc}")
             continue
