@@ -44,15 +44,24 @@ from typing import Optional
 MAX_PRICE = 1_300_000
 MIN_BEDROOMS = 3
 
-# NW London, N London, and NE-facing areas (E4/E17/E18)
+# Zone 2 outcodes only — N and NW London
+# NW1: Camden Town, Kentish Town, Euston
+# NW3: Belsize Park, Swiss Cottage, South Hampstead
+# NW5: Tufnell Park, Kentish Town (upper)
+# NW6: Kilburn, Queen's Park, West Hampstead
+# NW8: St John's Wood
+# NW10: Kensal Rise, Kensal Green
+# N1:  Islington, Canonbury, Barnsbury
+# N4:  Finsbury Park, Stroud Green
+# N5:  Highbury
+# N7:  Holloway, Caledonian Road
+# N16: Stoke Newington (Overground Zone 2)
+# N19: Archway, Upper Holloway
 TARGET_OUTCODES: list[str] = [
-    # NW London
-    "NW1", "NW2", "NW3", "NW4", "NW5", "NW6", "NW7", "NW8", "NW9", "NW10", "NW11",
-    # N London
-    "N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8", "N10", "N11",
-    "N12", "N13", "N14", "N19", "N20", "N21", "N22",
-    # NE-facing London
-    "N15", "N16", "E4", "E17", "E18",
+    # NW London — Zone 2
+    "NW1", "NW3", "NW5", "NW6", "NW8", "NW10",
+    # N London — Zone 2
+    "N1", "N4", "N5", "N7", "N16", "N19",
 ]
 
 # Rightmove building type codes for houses (excludes F=flat)
@@ -372,7 +381,7 @@ def build_email_html(
   <div style="background:#1a3a5c;color:#fff;padding:24px;border-radius:8px 8px 0 0">
     <h1 style="margin:0 0 6px;font-size:22px">🏡 London Property Alert</h1>
     <p style="margin:0;font-size:13px;opacity:0.85">
-      N · NW · NE London &nbsp;·&nbsp; ≤ {_fmt_price(MAX_PRICE)} &nbsp;·&nbsp;
+      Zone 2 · N &amp; NW London &nbsp;·&nbsp; ≤ {_fmt_price(MAX_PRICE)} &nbsp;·&nbsp;
       {MIN_BEDROOMS}+ beds &nbsp;·&nbsp; Period houses &nbsp;·&nbsp;
       Garden required &nbsp;·&nbsp; {period_label.title()}
     </p>
