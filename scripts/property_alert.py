@@ -44,7 +44,7 @@ from typing import Optional
 MAX_PRICE = 1_300_000
 MIN_BEDROOMS = 3
 
-# Zone 2 outcodes only — N and NW London
+# Zone 2 outcodes — N, NW, and NE London (no further east than Cambridge Heath Road)
 # NW1: Camden Town, Kentish Town, Euston
 # NW3: Belsize Park, Swiss Cottage, South Hampstead
 # NW5: Tufnell Park, Kentish Town (upper)
@@ -57,11 +57,15 @@ MIN_BEDROOMS = 3
 # N7:  Holloway, Caledonian Road
 # N16: Stoke Newington (Overground Zone 2)
 # N19: Archway, Upper Holloway
+# E8:  Hackney, Dalston, London Fields (Zone 2)
+# E2:  Bethnal Green, Cambridge Heath — eastern boundary (Cambridge Heath Road)
 TARGET_OUTCODES: list[str] = [
     # NW London — Zone 2
     "NW1", "NW3", "NW5", "NW6", "NW8", "NW10",
     # N London — Zone 2
     "N1", "N4", "N5", "N7", "N16", "N19",
+    # NE London — Zone 2, up to Cambridge Heath Road
+    "E8", "E2",
 ]
 
 # Rightmove building type codes for houses (excludes F=flat)
@@ -381,7 +385,7 @@ def build_email_html(
   <div style="background:#1a3a5c;color:#fff;padding:24px;border-radius:8px 8px 0 0">
     <h1 style="margin:0 0 6px;font-size:22px">🏡 London Property Alert</h1>
     <p style="margin:0;font-size:13px;opacity:0.85">
-      Zone 2 · N &amp; NW London &nbsp;·&nbsp; ≤ {_fmt_price(MAX_PRICE)} &nbsp;·&nbsp;
+      Zone 2 · N, NW &amp; NE London &nbsp;·&nbsp; ≤ {_fmt_price(MAX_PRICE)} &nbsp;·&nbsp;
       {MIN_BEDROOMS}+ beds &nbsp;·&nbsp; Period houses &nbsp;·&nbsp;
       Garden required &nbsp;·&nbsp; {period_label.title()}
     </p>
