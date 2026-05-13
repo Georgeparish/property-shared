@@ -1,0 +1,9 @@
+{
+  "webhook_url": {
+    "display_name": "N8N Copilot Webhook URL",
+    "description": "The N8N webhook endpoint for the Freshdesk Copilot workflow",
+    "type": "text",
+    "required": true,
+    "default_value": "https://saiplatform.app.n8n.cloud/webhook/freshdesk-copilot"
+  }
+}
